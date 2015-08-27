@@ -3,24 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/lucasmogari/fipe/Godeps/_workspace/src/github.com/PuerkitoBio/goquery"
+	"github.com/lucasmogari/fipe/Godeps/_workspace/src/golang.org/x/net/html"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 )
-
-//const (
-//	Carro    = 1
-//	Moto     = 2
-//	Caminhao = 3
-//)
-//
-//const (
-//	Gasolina = 1
-//	Alcool   = 2
-//	Diesel   = 3
-//)
-//
 
 var client = &http.Client{}
 
@@ -53,26 +42,49 @@ type Modelo struct {
 	DataConsulta     string
 }
 
-func ConsultarMarcas(codigoReferencia, tipoVeiculo int) (marcas []Marca, err error) {
+type PeriodoReferencia struct {
+	Label string
+	Codigo string
+}
+
+func ConsultarPeriodosReferencia() ([]PeriodoReferencia, error) {
+	doc, err := goquery.NewDocument("http://www.fipe.org.br/pt-br/indices/veiculos")
+	if err != nil {
+		return nil, err
+	}
+
+	options := doc.Find("select#selectTabelaReferenciacarro option")
+	periodos := make([]PeriodoReferencia, 0, options.Length())
+
+	options.Each(func(i int, s *goquery.Selection) {
+		value, exists := s.Attr("value")
+		if exists {
+			periodos = append(periodos, PeriodoReferencia{s.Text(), value})
+		}
+	})
+	return periodos, nil
+}
+
+func ConsultarMarcas(codigoPeriodoReferencia, tipoVeiculo int) (marcas []Marca, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 
 	return marcas, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarMarcas", data, &marcas)
 }
 
-func ConsultarModelos(codigoReferencia, tipoVeiculo, codigoMarca int) (modelos ModelosMarca, err error) {
+func ConsultarModelos(codigoPeriodoReferencia, tipoVeiculo, codigoMarca int) (modelos ModelosMarca, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("codigoMarca", strconv.Itoa(codigoMarca))
 
 	return modelos, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarModelos", data, &modelos)
 }
 
-func ConsultarModelosDoAno(codigoReferencia, tipoVeiculo, codigoMarca, anoModelo int) (modelos ModelosMarca, err error) {
+func ConsultarModelosDoAno(codigoPeriodoReferencia, tipoVeiculo, codigoMarca, anoModelo int) (modelos ModelosMarca, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("codigoMarca", strconv.Itoa(codigoMarca))
 	data.Add("anoModelo", strconv.Itoa(anoModelo))
@@ -80,9 +92,9 @@ func ConsultarModelosDoAno(codigoReferencia, tipoVeiculo, codigoMarca, anoModelo
 	return modelos, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarModelosAtravesDoAno", data, &modelos)
 }
 
-func ConsultarAnos(codigoReferencia, tipoVeiculo, codigoMarca, codigoModelo int) (anos []Ano, err error) {
+func ConsultarAnos(codigoPeriodoReferencia, tipoVeiculo, codigoMarca, codigoModelo int) (anos []Ano, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("codigoMarca", strconv.Itoa(codigoMarca))
 	data.Add("codigoModelo", strconv.Itoa(codigoModelo))
@@ -90,18 +102,18 @@ func ConsultarAnos(codigoReferencia, tipoVeiculo, codigoMarca, codigoModelo int)
 	return anos, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarAnoModelo", data, &anos)
 }
 
-func ConsultarAnosPorCodigoFipe(codigoReferencia, tipoVeiculo int, codigoFipe string) (anos []Ano, err error) {
+func ConsultarAnosPorCodigoFipe(codigoPeriodoReferencia, tipoVeiculo int, codigoFipe string) (anos []Ano, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("modeloCodigoExterno", codigoFipe)
 
 	return anos, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarAnoModeloPeloCodigoFipe", data, &anos)
 }
 
-func ConsultarModelo(codigoReferencia, tipoVeiculo, codigoMarca, codigoModelo, anoModelo, codigoTipoCombustivel int) (modelo Modelo, err error) {
+func ConsultarModelo(codigoPeriodoReferencia, tipoVeiculo, codigoMarca, codigoModelo, anoModelo, codigoTipoCombustivel int) (modelo Modelo, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("codigoMarca", strconv.Itoa(codigoMarca))
 	data.Add("codigoModelo", strconv.Itoa(codigoModelo))
@@ -111,9 +123,9 @@ func ConsultarModelo(codigoReferencia, tipoVeiculo, codigoMarca, codigoModelo, a
 	return modelo, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarValorComTodosParametros", data, &modelo)
 }
 
-func ConsultarModeloPorCodigoFipe(codigoReferencia, tipoVeiculo, anoModelo, codigoTipoCombustivel int, codigoFipe string) (modelo Modelo, err error) {
+func ConsultarModeloPorCodigoFipe(codigoPeriodoReferencia, tipoVeiculo, anoModelo, codigoTipoCombustivel int, codigoFipe string) (modelo Modelo, err error) {
 	data := &url.Values{}
-	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoReferencia))
+	data.Add("codigoTabelaReferencia", strconv.Itoa(codigoPeriodoReferencia))
 	data.Add("codigoTipoVeiculo", strconv.Itoa(tipoVeiculo))
 	data.Add("anoModelo", strconv.Itoa(anoModelo))
 	data.Add("codigoTipoCombustivel", strconv.Itoa(codigoTipoCombustivel))
@@ -121,6 +133,15 @@ func ConsultarModeloPorCodigoFipe(codigoReferencia, tipoVeiculo, anoModelo, codi
 	data.Add("tipoConsulta", "codigo")
 
 	return modelo, unmarshal("http://www.fipe.org.br/IndicesConsulta-ConsultarValorComTodosParametros", data, &modelo)
+}
+
+func getAttr(t html.Token, attrName string) string {
+	for _, attr := range t.Attr {
+		if attr.Key == attrName {
+			return attr.Val
+		}
+	}
+	return ""
 }
 
 func unmarshal(url string, data *url.Values, result interface{}) error {
