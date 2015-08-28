@@ -11,6 +11,18 @@ import (
 	"strconv"
 )
 
+//const (
+//	Carro    = 1
+//	Moto     = 2
+//	Caminhao = 3
+//)
+//
+//const (
+//	Gasolina = 1
+//	Alcool   = 2
+//	Diesel   = 3
+//)
+
 var client = &http.Client{}
 
 type Entry struct {
